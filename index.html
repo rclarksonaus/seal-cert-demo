@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SealCert 链上密封件签证平台</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 600px;
+      margin: auto;
+      line-height: 1.6;
+    }
+    input, button, textarea {
+      display: block;
+      width: 100%;
+      margin-bottom: 12px;
+      padding: 10px;
+      font-size: 16px;
+    }
+    button { cursor: pointer; }
+    #certOutput { white-space: pre-wrap; background: #f0f0f0; padding: 10px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <h1>SealCert 链上密封件签证平台</h1>
+
+  <button onclick="connectWallet()">连接钱包</button>
+
+  <h3>签发新证书</h3>
+  <input id="material" placeholder="材料名称">
+  <input id="model" placeholder="型号">
+  <input id="batchId" placeholder="批次号">
+  <input id="ipfsHash" placeholder="IPFS 报告链接">
+  <button onclick="issueCertificate()">签发</button>
+
+  <h3>查询证书</h3>
+  <input id="certId" placeholder="证书 ID">
+  <button onclick="getCertificate()">查询</button>
+  <div id="certOutput"></div>
+
+  <script>
+    const contractAddress = "0xB00cEf3E5Fd41bcCC9dF914D963DA286DA3dad24";
+    const contractABI = [
+      {
+        "inputs": [
+          {"internalType": "string", "name": "_material", "type": "string"},
+          {"internalType": "string", "name": "_model", "type": "string"},
+          {"internalType": "string", "name": "_batchId", "type": "string"},
+          {"internalType": "string", "name": "_ipfsHash", "type": "string"}
+        ],
+        "name": "issueCertificate",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {"internalType": "uint256", "name": "_certId", "type": "uint256"}
+        ],
+        "name": "getCertificate",
+        "outputs": [
+          {
+            "components": [
+              {"internalType": "string", "name": "material", "type": "string"},
+              {"internalType": "string", "name": "model", "type": "string"},
+              {"internalType": "string", "name": "batchId", "type": "string"},
+              {"internalType": "string", "name": "ipfsHash", "type": "string"},
+              {"internalType": "address", "name": "issuer", "type": "address"},
+              {"internalType": "uint256", "name": "timestamp", "type": "uint256"}
+            ],
+            "internalType": "struct SealCert.Certificate",
+            "name": "",
+            "type": "tuple"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      }
+    ];
+
+    let provider, signer, contract;
+
+    async function connectWallet() {
+      if (!window.ethereum) return alert("请安装 MetaMask");
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
+      signer = provider.getSigner();
+      contract = new ethers.Contract(contractAddress, contractABI, signer);
+      alert("钱包连接成功");
+    }
+
+    async function issueCertificate() {
+      const material = document.getElementById("material").value;
+      const model = document.getElementById("model").value;
+      const batchId = document.getElementById("batchId").value;
+      const ipfsHash = document.getElementById("ipfsHash").value;
+      if (!material || !model || !batchId || !ipfsHash) return alert("请填写完整");
+
+      try {
+        const tx = await contract.issueCertificate(material, model, batchId, ipfsHash);
+        await tx.wait();
+        alert("证书已上链");
+      } catch (e) {
+        alert("Error: " + e.message);
+      }
+    }
+
+    async function getCertificate() {
+      const certId = document.getElementById("certId").value;
+      if (!certId) return alert("ID 不能为空");
+      try {
+        const cert = await contract.getCertificate(certId);
+        document.getElementById("certOutput").innerText =
+          `材料: ${cert.material}\n型号: ${cert.model}\n批次: ${cert.batchId}\nIPFS: ${cert.ipfsHash}\n签发人: ${cert.issuer}\n时间: ${new Date(cert.timestamp * 1000).toLocaleString()}`;
+      } catch (e) {
+        alert("Error: " + e.message);
+      }
+    }
+  </script>
+</body>
+</html>
